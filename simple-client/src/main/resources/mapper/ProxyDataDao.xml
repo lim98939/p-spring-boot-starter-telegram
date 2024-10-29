@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.voroby.springframework.telegram.dao.ProxyDataDao">
+
+    <resultMap type="dev.voroby.springframework.telegram.entity.ProxyData" id="ProxyDataMap">
+        <result property="poxyid" column="poxyId" jdbcType="INTEGER"/>
+        <result property="poxyaddress" column="poxyAddress" jdbcType="VARCHAR"/>
+        <result property="poxyport" column="poxyPort" jdbcType="INTEGER"/>
+        <result property="poxysecret" column="poxySecret" jdbcType="VARCHAR"/>
+        <result property="poxytype" column="poxyType" jdbcType="VARCHAR"/>
+        <result property="proxyname" column="proxyName" jdbcType="VARCHAR"/>
+        <result property="username" column="username" jdbcType="VARCHAR"/>
+        <result property="password" column="password" jdbcType="VARCHAR"/>
+        <result property="proxyimg" column="proxyImg" jdbcType="INTEGER"/>
+        <result property="createdAt" column="created_at" jdbcType="TIMESTAMP"/>
+        <result property="updatedAt" column="updated_at" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <!--查询单个-->
+    <select id="queryById" resultMap="ProxyDataMap">
+        select poxyId,
+               poxyAddress,
+               poxyPort,
+               poxySecret,
+               poxyType,
+               proxyName,
+               username,
+               password,
+               proxyImg,
+               created_at,
+               updated_at
+        from proxy_data
+        where poxyId = #{poxyid}
+    </select>
+
+    <!--查询指定行数据-->
+    <select id="queryAllByLimit" resultMap="ProxyDataMap">
+        select
+        poxyId, poxyAddress, poxyPort, poxySecret, poxyType, proxyName, username, password, proxyImg
+        from proxy_data
+        limit #{pageable.offset}, #{pageable.pageSize}
+    </select>
+
+    <!--统计总行数-->
+    <select id="count" resultType="java.lang.Long">
+        select count(1)
+        from proxy_data
+        <where>
+            <if test="poxyid != null">
+                and poxyId = #{poxyid}
+            </if>
+            <if test="poxyaddress != null and poxyaddress != ''">
+                and poxyAddress = #{poxyaddress}
+            </if>
+            <if test="poxyport != null">
+                and poxyPort = #{poxyport}
+            </if>
+            <if test="poxysecret != null and poxysecret != ''">
+                and poxySecret = #{poxysecret}
+            </if>
+            <if test="poxytype != null and poxytype != ''">
+                and poxyType = #{poxytype}
+            </if>
+            <if test="proxyname != null and proxyname != ''">
+                and proxyName = #{proxyname}
+            </if>
+            <if test="username != null and username != ''">
+                and username = #{username}
+            </if>
+            <if test="password != null and password != ''">
+                and password = #{password}
+            </if>
+            <if test="proxyimg != null">
+                and proxyImg = #{proxyimg}
+            </if>
+            <if test="createdAt != null">
+                and created_at = #{createdAt}
+            </if>
+            <if test="updatedAt != null">
+                and updated_at = #{updatedAt}
+            </if>
+        </where>
+    </select>
+
+    <!--新增所有列-->
+    <insert id="insert" keyProperty="poxyid" useGeneratedKeys="true">
+        insert into proxy_data(poxyAddress, poxyPort, poxySecret, poxyType, proxyName, username, password, proxyImg,
+                               created_at, updated_at)
+        values (#{poxyaddress}, #{poxyport}, #{poxysecret}, #{poxytype}, #{proxyname}, #{username}, #{password},
+                #{proxyimg}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <insert id="insertBatch" keyProperty="poxyid" useGeneratedKeys="true">
+        insert into proxy_data(poxyAddress, poxyPort, poxySecret, poxyType, proxyName, username, password, proxyImg,
+        created_at, updated_at)
+        values
+        <foreach collection="entities" item="entity" separator=",">
+            (#{entity.poxyaddress}, #{entity.poxyport}, #{entity.poxysecret}, #{entity.poxytype}, #{entity.proxyname},
+            #{entity.username}, #{entity.password}, #{entity.proxyimg}, #{entity.createdAt}, #{entity.updatedAt})
+        </foreach>
+    </insert>
+
+    <insert id="insertOrUpdateBatch" keyProperty="poxyid" useGeneratedKeys="true">
+        insert into proxy_data(poxyAddress, poxyPort, poxySecret, poxyType, proxyName, username, password, proxyImg,
+        created_at, updated_at)
+        values
+        <foreach collection="entities" item="entity" separator=",">
+            (#{entity.poxyaddress}, #{entity.poxyport}, #{entity.poxysecret}, #{entity.poxytype}, #{entity.proxyname},
+            #{entity.username}, #{entity.password}, #{entity.proxyimg}, #{entity.createdAt}, #{entity.updatedAt})
+        </foreach>
+        on duplicate key update
+        poxyAddress = values(poxyAddress),
+        poxyPort = values(poxyPort),
+        poxySecret = values(poxySecret),
+        poxyType = values(poxyType),
+        proxyName = values(proxyName),
+        username = values(username),
+        password = values(password),
+        proxyImg = values(proxyImg),
+        created_at = values(created_at),
+        updated_at = values(updated_at)
+    </insert>
+
+    <!--通过主键修改数据-->
+    <update id="update">
+        update proxy_data
+        <set>
+            <if test="poxyaddress != null and poxyaddress != ''">
+                poxyAddress = #{poxyaddress},
+            </if>
+            <if test="poxyport != null">
+                poxyPort = #{poxyport},
+            </if>
+            <if test="poxysecret != null and poxysecret != ''">
+                poxySecret = #{poxysecret},
+            </if>
+            <if test="poxytype != null and poxytype != ''">
+                poxyType = #{poxytype},
+            </if>
+            <if test="proxyname != null and proxyname != ''">
+                proxyName = #{proxyname},
+            </if>
+            <if test="username != null and username != ''">
+                username = #{username},
+            </if>
+            <if test="password != null and password != ''">
+                password = #{password},
+            </if>
+            <if test="proxyimg != null">
+                proxyImg = #{proxyimg},
+            </if>
+            <if test="createdAt != null">
+                created_at = #{createdAt},
+            </if>
+            <if test="updatedAt != null">
+                updated_at = #{updatedAt},
+            </if>
+        </set>
+        where poxyId = #{poxyid}
+    </update>
+
+    <!--通过主键删除-->
+    <delete id="deleteById">
+        delete
+        from proxy_data
+        where poxyId = #{poxyid}
+    </delete>
+
+    <!--删除-->
+    <delete id="deleteALL">
+        TRUNCATE TABLE proxy_data;
+    </delete>
+
+</mapper>
+

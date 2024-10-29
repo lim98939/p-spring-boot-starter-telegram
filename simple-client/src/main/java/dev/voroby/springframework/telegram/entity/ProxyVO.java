@@ -1,6 +1,6 @@
 package dev.voroby.springframework.telegram.entity;
 
-import dev.voroby.springframework.telegram.client.TdApi;
+import org.drinkless.tdlib.TdApi;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;

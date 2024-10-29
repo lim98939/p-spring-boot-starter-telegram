@@ -6,12 +6,13 @@ import dev.voroby.springframework.telegram.client.TelegramClient;
 import dev.voroby.springframework.telegram.client.templates.response.Response;
 import dev.voroby.springframework.telegram.entity.ProxyData;
 import dev.voroby.springframework.telegram.entity.ProxyVO;
+import dev.voroby.springframework.telegram.utils.AesUtils;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -20,8 +21,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-import static java.util.Optional.ofNullable;
-
 @Service @Slf4j
 public class TelegramClientService {
 
@@ -29,13 +28,17 @@ public class TelegramClientService {
 
     private final Deque<TdApi.Message> messages = new ConcurrentLinkedDeque<>();
 
-    private final PostService postService;
-
     public static int PROXY_COUNT = 7;
 
-    public TelegramClientService(@Lazy TelegramClient telegramClient, PostService postService) {
+    private final ProxyDataService proxyDataService;
+
+    private String sendMsg = "";
+
+    public static Boolean SCHEDULED= false;
+
+    public TelegramClientService(@Lazy TelegramClient telegramClient, ProxyDataService proxyDataService) {
         this.telegramClient = telegramClient;
-        this.postService = postService;
+        this.proxyDataService = proxyDataService;
     }
 
 //    public void putMessage(TdApi.Message msg) {
@@ -72,9 +75,7 @@ public class TelegramClientService {
         // 使用 CompletableFuture 并行处理代理信息
         List<CompletableFuture<ProxyVO>> futureList = new ArrayList<>();
 
-        // 使用 CompletableFuture 并行处理代理信息
-        List<TdApi.Proxy> badFutureList = new ArrayList<>();
-
+        List<TdApi.Proxy> badProxies = new ArrayList<>();
 
         for (TdApi.Proxy proxy : proxies.proxies) {
             CompletableFuture<ProxyVO> future = CompletableFuture.supplyAsync(() -> {
@@ -90,15 +91,15 @@ public class TelegramClientService {
 
                     // 如果 seconds 为空，直接跳过（不加入集合）
                     if (seconds == null) {
-                        log.warn("PingProxy returned null for proxy ID: " + proxy.id);
-                        badFutureList.add(proxy);
+                        log.warn("PingProxy returned null for proxy ID: " + proxy.server);
+                        badProxies.add(proxy);
                         return null; // 返回 null 代表不加入集合
                     }
 
                 } catch (Exception e) {
                     // 捕获异常并记录日志，不处理该代理
-                    log.error("Error while processing proxy ID: " + proxy.id, e);
-                    badFutureList.add(proxy);
+                    log.error("Error while processing proxy ID: " + proxy.server, e);
+                    badProxies.add(proxy);
                     return null; // 返回 null 代表不加入集合
                 }
 
@@ -109,27 +110,24 @@ public class TelegramClientService {
             futureList.add(future); // 将每个异步任务加入到列表中
         }
 
-        if (badFutureList.size() > 0) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", Locale.CHINESE);
-            // 将 Date 转换为中文格式的字符串
-            String chineseDate = sdf.format(new Date());
-            StringBuilder badProxiesStr = new StringBuilder(chineseDate + "\t\t \uD83D\uDEAB有误代理信息:\n\n");
-            for (TdApi.Proxy proxy : badFutureList) {
+        // 等待所有任务完成，并过滤掉返回 null 的结果
+         List<ProxyVO> noNullProxies = futureList.stream()
+                .map(CompletableFuture::join) // 等待每个 CompletableFuture 完成
+                .filter(Objects::nonNull)     // 过滤掉 null 值
+                .collect(Collectors.toList());
+
+        if (!badProxies.isEmpty()) {
+            StringBuilder badProxiesStr = new StringBuilder("\uD83D\uDEAB有误代理信息:\n\n");
+            for (TdApi.Proxy proxy : badProxies) {
                 badProxiesStr.append("\uD83D\uDD3A").append(" - ").append("【")
                         .append(proxy.server).append("\t | ")
                         .append(proxy.port).append("】").append("\n");
             }
             String finalMsg = badProxiesStr.toString();
-            telegramClient.sendAsync(sendMessageQuery(1544849672L, finalMsg));
+            sendMsg += finalMsg + "\n\n";
         }
 
-
-        // 等待所有任务完成，并过滤掉返回 null 的结果
-
-        return futureList.stream()
-                .map(CompletableFuture::join) // 等待每个 CompletableFuture 完成
-                .filter(Objects::nonNull)     // 过滤掉 null 值
-                .collect(Collectors.toList());
+        return noNullProxies;
     }
 
     public static List<ProxyVO> getRandom7ProxyVOS(List<ProxyVO> proxyVOS) {
@@ -141,10 +139,6 @@ public class TelegramClientService {
             // 否则，返回原集合
             return proxyVOS;
         }
-    }
-
-    public Mono<String> send(Map<String, Object> requestBody) {
-        return postService.sendPostRequest("/proxyData", requestBody);  // 调用发送请求的方法
     }
 
     private TdApi.SendMessage sendMessageQuery(Long chatId, String msg) {
@@ -159,20 +153,30 @@ public class TelegramClientService {
     @Scheduled(cron = "0 0 8 * * ?", zone = "Asia/Shanghai")
 //    @Scheduled(fixedDelay = 60000 * 5)
     private void reSetProxies() {
+        if (!SCHEDULED) {
+            System.out.println("Selected False");
+            return;
+        }
+        // 输出每个 ProxyVO 的详细信息
+
+        // 定义中文日期格式
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", Locale.CHINESE);
+
+        // 将 Date 转换为中文格式的字符串
+        String chineseDate = sdf.format(new Date());
+        sendMsg = "==="+chineseDate+"===\n";
         try {
             List<ProxyVO> proxyVOS = getRandom7ProxyVOS(getProxies());
-
+            if (proxyVOS.isEmpty()){
+                return;
+            }
+            this.proxyDataService.deleteALL();
             // 输出每个 ProxyVO 的详细信息
             System.out.println("Selected ProxyVO Details:");
-            // 定义中文日期格式
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", Locale.CHINESE);
-
-            // 将 Date 转换为中文格式的字符串
-            String chineseDate = sdf.format(new Date());
-            StringBuilder msg = new StringBuilder(chineseDate + "\t\t \uD83D\uDCF1代理信息:\n\n");
+            StringBuilder msg = new StringBuilder("\uD83D\uDCF1代理信息:\n\n");
             int index = 1;
             for (ProxyVO proxyVO : proxyVOS) {
-                System.out.println(proxyVO);  // 输出 ProxyVO 对象的详细信息
+                log.info(proxyVO.toString());  // 输出 ProxyVO 对象的详细信息
                 ProxyData proxyData = new ProxyData();
                 String[] serverStrS = proxyVO.server.split("\\.");
                 proxyData.setProxyname("line connection - "+serverStrS[0]+"#"+serverStrS[3]);
@@ -188,14 +192,11 @@ public class TelegramClientService {
                 }
                 proxyData.setPoxytype(type);
                 proxyData.setProxyimg(1);
+                proxyData.setPoxyid(index);
                 proxyData.setCreatedAt(new Date());
+                proxyData.setUpdatedAt(new Date());
 
-                // 使用 ObjectMapper 将对象转换为 Map
-                ObjectMapper objectMapper = new ObjectMapper();
-                Map<String, Object> requestBody = objectMapper.convertValue(proxyData, Map.class);
-
-                Mono<String> res = send(requestBody);
-                System.out.println(res.block());
+                this.proxyDataService.insert(proxyData);
                 String applyBtn = "➖  "+proxyVO.httpUrl.url;
                 msg.append(index).append(" - ").append("【")
                         .append(proxyVO.server).append("\t | ")
@@ -205,7 +206,8 @@ public class TelegramClientService {
             }
 
             String finalMsg = msg.toString();
-            telegramClient.sendAsync(sendMessageQuery(1544849672L, finalMsg));
+            sendMsg += finalMsg;
+            telegramClient.sendAsync(sendMessageQuery(1544849672L, sendMsg));
 
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException(e);

@@ -1,0 +1,10 @@
+services:
+  telegram-client:
+    image: registry.cn-hangzhou.aliyuncs.com/teleph/telegram-client
+    container_name: telegram-client
+    ports:
+      - "9399:9399"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./database:/app/database  # 替换为宿主机和容器中的实际路径

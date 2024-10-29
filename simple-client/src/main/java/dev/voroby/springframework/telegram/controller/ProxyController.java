@@ -1,6 +1,6 @@
 package dev.voroby.springframework.telegram.controller;
 
-import dev.voroby.springframework.telegram.client.TdApi;
+import org.drinkless.tdlib.TdApi;
 import dev.voroby.springframework.telegram.client.TelegramClient;
 import dev.voroby.springframework.telegram.entity.ProxyVO;
 import dev.voroby.springframework.telegram.exception.TelegramClientTdApiException;
@@ -21,6 +21,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 import static dev.voroby.springframework.telegram.service.TelegramClientService.PROXY_COUNT;
+import static dev.voroby.springframework.telegram.service.TelegramClientService.SCHEDULED;
 
 @RestController
 @Slf4j
@@ -80,6 +81,13 @@ public class ProxyController {
     public Integer setProxyCount(@RequestBody @Valid Credential credential) throws ExecutionException, InterruptedException {
         PROXY_COUNT = Integer.parseInt(credential.value);
         return PROXY_COUNT;
+    }
+
+
+    @PostMapping(value = "/scheduled", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Boolean setSelected(@RequestBody @Valid Credential credential) throws ExecutionException, InterruptedException {
+        SCHEDULED = Boolean.parseBoolean(credential.value);
+        return SCHEDULED;
     }
 
     @PostMapping(value = "/GetProxyLink", consumes = MediaType.APPLICATION_JSON_VALUE)
